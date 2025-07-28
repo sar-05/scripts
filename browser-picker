@@ -1,0 +1,46 @@
+#!/bin/bash
+# Browser picker for mimeapps integration
+# The URL is passed as the first argument by xdg-open
+
+URL="$1"
+
+# Ensure we have access to the display (important for rofi)
+if [[ -z "$DISPLAY" && -z "$WAYLAND_DISPLAY" ]]; then
+    # Fallback to default browser if no display available
+    firefox "$URL" &
+    exit 0
+fi
+
+# Define your browsers (adjust commands to match your system)
+browsers=(
+    "flatpak run app.zen_browser.zen|Zen Browser"
+    "flatpak run org.mozilla.firefox|Firefox"
+    "flatpak run --env=MOZ_ENABLE_WAYLAND=1 --env=GDK_BACKEND=wayland net.mullvad.MullvadBrowser|Mullvad Browser" 
+    "flatpak run com.brave.Browser|Brave"
+)
+
+# If no URL provided, exit silently (mimeapps might call without arguments)
+if [[ -z "$URL" ]]; then
+    exit 1
+fi
+
+# Create menu options
+menu_options=""
+for browser in "${browsers[@]}"; do
+    name="${browser##*|}"
+    menu_options="${menu_options}${name}\n"
+done
+
+# Show rofi menu
+chosen=$(echo -e "$menu_options" | rofi -dmenu -p "Open with:" -theme-str 'window {width: 400px;}')
+
+# Find the corresponding command and execute
+for browser in "${browsers[@]}"; do
+    cmd="${browser%%|*}"
+    name="${browser##*|}"
+    if [[ "$name" == "$chosen" ]]; then
+        # Use nohup to detach from parent process (important for mimeapps)
+        nohup $cmd "$URL" >/dev/null 2>&1 &
+        exit 0
+    fi
+done

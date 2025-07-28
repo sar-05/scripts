@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+# Flatpak management wrapper with fzf integration
+#
+set -euo pipefail
+
+#Check for dependencies
+dependencies=(flatpak fzf)
+for dependency in "${dependencies[@]}"; do
+  if ! command -v "$dependency" > /dev/null; then
+    echo "ERROR: $dependency not found" >&2
+    exit 1
+  fi
+done
+
+#Global variables
+readonly QUERY="${2:-}"
+
+show_help() {
+    cat << EOF
+Usage: $(basename "$0") [OPTION] [QUERY]
+Flatpak management wrapper with fzf integration
+
+OPTIONS:
+    -s  Search for packages
+    -i  Install package
+    -l  List installed packages
+    -r  Remove package
+    -u  Update all packages
+    -h  Show this help
+
+EXAMPLES:
+    $(basename "$0") -s firefox
+    $(basename "$0") -i
+EOF
+}
+
+flatpak_picker(){
+  local application
+  local query="${1:-}"
+  if [[ -n "$query" ]]; then
+    application=$(fzf -q "$query" --delimiter='\t' --with-nth=1,2)
+  else
+    application=$(fzf --delimiter='\t' --with-nth=1,2)
+  fi
+  echo "$application" | awk -F '\t' '{print $3}'
+}
+
+flatpak_list(){
+  if [[ -n "$QUERY" ]]; then
+    flatpak list --columns=name,description,application | flatpak_picker "$QUERY"
+  else 
+    flatpak list --columns=name,description,application | flatpak_picker 
+  fi
+}
+
+copy_id(){
+  if command -v wl-copy > /dev/null; then 
+    wl-copy
+  else
+    echo 'WARNING: wl-copy not found' >&2
+    cat
+  fi
+}
+
+# Exit if no arguments are given
+if [[ $# -eq 0 ]]; then
+    show_help
+    exit 0
+fi
+
+while getopts "silruh" flag; do
+  case "$flag" in
+    's')
+      if [[ -n "$QUERY" ]]; then
+        flatpak search "$QUERY" | flatpak_picker | copy_id 
+      else
+        echo "ERROR: No query was given" >&2
+      fi
+      ;; 
+    'i')
+      if [[ -n "$QUERY" ]]; then
+        app_id=$(flatpak search "$QUERY" | flatpak_picker)
+        [[ -n "$app_id" ]] && flatpak install "$app_id"
+      else
+        echo "ERROR: No query was given" >&2
+      fi
+      ;;
+    'l')
+      flatpak_list | copy_id
+      ;;
+    'r')
+      app_id=$(flatpak_list)
+      [[ -n "$app_id" ]] && flatpak remove --delete-data "$app_id"
+      ;;
+    'u')
+      flatpak update
+      ;;
+    'h')
+      show_help
+      ;;
+    ?)
+      show_help
+      exit 1
+  esac
+done

@@ -1,0 +1,9 @@
+#!/bin/bash
+# Generate FIGlet art of OS name
+pyfiglet -s -f small_slant $(fastfetch -s os --format json | jq -r '.[0].result.name')
+
+# Add spacing
+echo
+
+# Run fastfetch
+fastfetch -l none --load-config ~/.config/fastfetch/config.jsonc

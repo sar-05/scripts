@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+pkgs_path="$HOME/Backups/packages"
+main_pkgs_path="$pkgs_path/official"
+aur_pkgs_path="$pkgs_path/aur"
+flatpaks_pkgs_path="$pkgs_path/flatpaks"
+date=$(date +%F-%H%M)
+
+pkgs_backup_setup() {
+   (
+     local backup_dir="$1"
+     local oldest_file=""
+
+     #Make sure backup directory exists
+     if [ ! -d "$backup_dir" ]; then
+       mkdir -p "$backup_dir"
+     fi
+     
+     # Remove oldest backup if more than 5
+     cd "$backup_dir" || { echo "ERROR: Unable to cd to $backup_dir" ; exit; }
+ 
+     local i=0
+     for file in ./*; do
+       if [[ -f "$file" ]]; then
+         ((++i))
+         if [[ -z "$oldest_file" ]] || [[ "$file" -ot "$oldest_file" ]]; then
+             oldest_file="$file"
+         fi
+       fi
+     done
+
+     if [[ "$i" -ge 5 ]]; then
+       rm "$oldest_file"
+     fi
+   )
+}
+
+# Call setup function for official packages and AUR packages
+pkgs_backup_setup "$main_pkgs_path"
+pkgs_backup_setup "$aur_pkgs_path"
+pkgs_backup_setup "$flatpaks_pkgs_path"
+
+# Create backup files
+pacman -Qenq > "$main_pkgs_path/$date-official-packages.txt"
+pacman -Qemq > "$aur_pkgs_path/$date-aur-packages.txt"
+flatpak list --columns=application | grep -v "ID" > "$flatpaks_pkgs_path/$date-flatpak-packages.txt"

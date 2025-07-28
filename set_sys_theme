@@ -1,0 +1,138 @@
+#!/bin/bash
+
+#GTK Theme Variables
+dark_theme='Gruvbox-Dark'
+light_theme='Gruvbox-Light'
+current_theme=$(gsettings get org.gnome.desktop.interface gtk-theme | tr -d "'")
+
+#Icon Theme Variables
+dark_icons='Papirus-Dark'
+light_icons='Papirus-Light'
+current_icons=$(gsettings get org.gnome.desktop.interface icon-theme | tr -d "'")
+
+#Qt Color Scheme Variables (separate from GTK themes)
+dark_qt_scheme='Gruvbox-Dark'
+light_qt_scheme='Gruvbox-Light'
+
+#Monitor Name
+monitor=$(hyprctl monitors -j | jq -r '.[0].name')
+
+#Wallpapers Paths
+dark_wallpaper="/home/sar/Pictures/Wallpapers/gruvbox_planet.png"
+light_wallpaper="/home/sar/Pictures/Wallpapers/gruvbox_sunflowers.png"
+current_wallpaper=$(hyprctl hyprpaper listactive | cut -d' ' -f3)
+
+if [ $# -ne 0 ]; then
+  while getopts "cld" flag; do
+    case "$flag" in
+      c)
+        theme="$current_theme"
+        icons="$current_icons"
+        wallpaper=$(cat ~/.config/hypr/hyprconf/wallpaper_path 2>/dev/null || echo "$current_wallpaper")
+        # Map current GTK theme to appropriate Qt color scheme
+        if [ "$current_theme" = "$light_theme" ]; then
+          qt_scheme="$light_qt_scheme"
+        else
+          qt_scheme="$dark_qt_scheme"
+        fi
+        ;;
+      l)
+        theme="$light_theme"
+        icons="$light_icons"
+        wallpaper="$light_wallpaper"
+        qt_scheme="$light_qt_scheme"
+        ;;
+      d)
+        theme="$dark_theme"
+        icons="$dark_icons"
+        wallpaper="$dark_wallpaper"
+        qt_scheme="$dark_qt_scheme"
+        ;;
+      ?)
+        echo "Invalid argument"
+        exit 1
+        ;;
+    esac
+  done
+else
+  # Toggle mode
+  if [ "$current_theme" = "$light_theme" ]; then
+    theme="$dark_theme"
+    icons="$dark_icons"
+    wallpaper="$dark_wallpaper"
+    qt_scheme="$dark_qt_scheme"
+  else
+    theme="$light_theme"
+    icons="$light_icons"
+    wallpaper="$light_wallpaper"
+    qt_scheme="$light_qt_scheme"
+  fi
+fi
+
+# Validate theme exists
+# Themes at https://www.pling.com/p/1681313
+if [ ! -d "/usr/share/themes/$theme" ]; then
+  echo "Theme $theme not found in /usr/share/themes/"
+  notify-send "Theme Error" "Theme $theme not found"
+  exit 1
+fi
+
+gtk_preference=$(echo "$theme" | cut -d'-' -f2 | tr '[:upper:]' '[:lower:]')
+
+# Apply GTK theme settings
+gsettings set org.gnome.desktop.interface gtk-theme "$theme"
+gsettings set org.gnome.desktop.interface icon-theme "$icons"
+gsettings set org.gnome.desktop.interface color-scheme "prefer-$gtk_preference"
+
+# Clear existing GTK4 config
+rm -rf ~/.config/gtk-4.0
+mkdir -p ~/.config/gtk-4.0
+
+# Symlink the theme's GTK4 CSS files
+if [ -d "/usr/share/themes/$theme/gtk-4.0" ]; then
+  ln -s /usr/share/themes/"$theme"/gtk-4.0/* ~/.config/gtk-4.0/
+fi
+
+# Make sure themes are in ~/.themes for Flatpak
+mkdir -p ~/.themes
+
+# Check if theme update is needed
+if [ ! -d "$HOME/.themes/$dark_theme" ] || [ "/usr/share/themes/$dark_theme" -nt "$HOME/.themes/$dark_theme" ]; then
+  rm -rf "$HOME/.themes/$dark_theme"
+  cp -r "/usr/share/themes/$dark_theme" "$HOME/.themes/"
+fi
+
+if [ ! -d "$HOME/.themes/$light_theme" ] || [ "/usr/share/themes/$light_theme" -nt "$HOME/.themes/$light_theme" ]; then
+  rm -rf "$HOME/.themes/$light_theme"
+  cp -r "/usr/share/themes/$light_theme" "$HOME/.themes/"
+fi
+
+# Update Flatpak theme environment variable
+flatpak override --user --env=GTK_THEME="$theme" --env=ICON_THEME="$icons"
+
+# Signal GTK to update themes immediately
+dbus-send --session --dest=org.gtk.Settings --type=method_call /org/gtk/Settings org.gtk.Settings.ThemeChanged
+
+# Switch wallpaper
+hyprctl hyprpaper wallpaper "$monitor,$wallpaper"
+
+#Override hyprlock wallpaper line
+sed -i "s|path = .*png|path = $wallpaper|" ~/.config/hypr/hyprlock.conf
+
+#Setting qt theme (with validation)
+qt_config_file="$HOME/.config/qt6ct/qt6ct.conf"
+qt_color_file="$HOME/.config/qt6ct/colors/$qt_scheme.conf"
+
+if [ -f "$qt_config_file" ]; then
+  if [ -f "$qt_color_file" ]; then
+    sed -i "s|^color_scheme_path=.*|color_scheme_path=$qt_color_file|" "$qt_config_file"
+    echo "Qt color scheme updated to: $qt_scheme"
+  else
+    echo "Warning: Qt color scheme file not found: $qt_color_file"
+  fi
+else
+  echo "Warning: Qt6ct config file not found: $qt_config_file"
+fi
+
+# Send notification
+notify-send "Theme Changed" "$theme"

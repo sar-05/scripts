@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+TARGET="$HOME/.local/bin"
+NAME=$(basename "$0")
+readonly TARGET NAME
+
+[[ -d "$TARGET" ]] || {  mkdir -p "$TARGET" && echo "Created missing $TARGET dir" ;}
+
+for file in ./*; do
+  if ! [[ "$file" = "./$NAME" ]]; then
+    path=$(realpath "$file")
+    ln -sf "$path" "$TARGET" && echo "Created $file symlink to $TARGET"
+  fi
+done

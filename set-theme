@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+# Sets light or dark theme for GTK and QT frameworks
+#
+set -euo pipefail
+
+CONF_FILE="${XDG_CONFIG_HOME:=$HOME/.config}/set-theme/set-theme.conf"
+
+declare -A conf
+while IFS='=' read -r key value; do
+  #regex matches whitespace POSIX character class and # at the start of a line
+  [[ -n "$key" && ! "$key" =~ ^[[:space:]]*# ]] || continue 
+  conf["$key"]="$value"
+done < "$CONF_FILE"
+
+log(){
+  local err_type err
+  err_type="$1"
+  err="$2"
+  if [[ "$err_type" = '-e' ]]; then
+    echo "ERROR: $err"
+  elif [[ "$err_type" = '-w' ]]; then
+    echo "WARNING: $err"
+  fi
+}
+
+is_valid(){
+  local path=''
+  local opt="$1"
+  local theme="$2"
+
+  case "$opt" in
+    '-g') path="/usr/share/themes/$theme/index.theme" ;;
+    '-t') path="$HOME/.themes/$theme/index.theme" ;;
+    '-i') path="/usr/share/icons/$theme/index.theme" ;;
+    '-c') path="$HOME/.icons/$theme/index.theme" ;;
+    '-q') path="$HOME/.config/qt6ct/colors/$theme.conf" ;;
+    '-w') path="$theme" ;;
+    *) log -e "Invalid option: $opt" ; return 1 ;;
+  esac
+
+  if [[ -z "$path" ]]; then
+    log -e "Missing argument for is_valid $opt"
+    return 1
+  fi
+
+  if [[ ! -f "$path" ]]; then
+    log -e "$path not found"
+    return 1
+  fi
+}
+
+copy_global(){
+  local dir target
+  local opt="$1"
+  local theme="$2"
+  case "$opt" in
+    '-g') dir="/usr/share/themes/$theme" ; target="$HOME/.themes/" ;;
+    '-i') dir="/usr/share/icons/$theme" ; target="$HOME/.icons/" ;;
+    *) return 1 ;;
+  esac
+
+  if [[ -z $opt ]]; then
+    log -e "Missing argument for copy_global"
+  fi
+
+  mkdir -p "$target"
+  cp -r "$dir" "$target" && log -w "Copied $dir to $target"
+}
+
+if [[ $# -eq 1 ]]; then
+  while getopts 'ld' flag; do
+    case "$flag" in
+      'l')
+        is_valid '-g' "${conf[light_gtk]}" && readonly GTK="${conf[light_gtk]}"
+        is_valid -q "${conf[light_qt]}" && readonly QT="${conf[light_qt]}"
+        is_valid -w "${conf[light_wallpaper]}" && readonly WALLPAPER="${conf[light_wallpaper]}"
+        is_valid -i "${conf[light_icons]}" && readonly ICONS="${conf[light_icons]}"
+        readonly COLOR='light'
+        ;;
+      'd')
+        is_valid -g "${conf[dark_gtk]}" && readonly GTK="${conf[dark_gtk]}"
+        is_valid -q "${conf[dark_qt]}" && readonly QT="${conf[dark_qt]}"
+        is_valid -w "${conf[dark_wallpaper]}" && readonly WALLPAPER="${conf[dark_wallpaper]}"
+        is_valid -i "${conf[dark_icons]}" && readonly ICONS="${conf[dark_icons]}"
+        readonly COLOR='dark'
+        ;;
+      ?)
+        err_type -e 'Invalid option'
+        ;;
+    esac
+  done
+else
+  log -e "Invalid amount of arguments"
+  exit 1
+fi
+
+#Check for local themes
+{ ! is_valid -t "$GTK" ;} && copy_global -g "$GTK"
+{ ! is_valid -c "$ICONS" ;} && copy_global -i "$ICONS"
+
+# Apply GTK3 theme settings
+gsettings set org.gnome.desktop.interface gtk-theme "$GTK"
+gsettings set org.gnome.desktop.interface icon-theme "$ICONS"
+gsettings set org.gnome.desktop.interface color-scheme "prefer-$COLOR"
+# Signal GTK to update themes immediately
+dbus-send --session --dest=org.gtk.Settings --type=method_call /org/gtk/Settings org.gtk.Settings.ThemeChanged
+# Update Flatpak theme environment variable
+flatpak override --user --env=GTK_THEME="$GTK"  --env=ICON_THEME="$ICONS"
+
+# Apply GTK4 theme settings
+rm -rf ~/.config/gtk-4.0
+mkdir -p ~/.config/gtk-4.0
+# Symlink the theme's GTK4 CSS files
+if [ -d "/usr/share/themes/$GTK/gtk-4.0" ]; then
+  ln -s /usr/share/themes/"$GTK"/gtk-4.0/* ~/.config/gtk-4.0/
+fi
+
+#Setting QT theme
+readonly QT_CONF_FILE="$HOME/.config/qt6ct/qt6ct.conf"
+if [ -f "$QT_CONF_FILE" ]; then
+  sed -i "s|^color_scheme_path=.*|color_scheme_path=$QT|" "$QT_CONF_FILE"
+else
+  log -w "$QT_CONF_FILE not found"
+fi
+
+#Apply Wallpaper
+hyprctl hyprpaper wallpaper "$(hyprctl monitors -j | jq -r '.[0].name'),$WALLPAPER"
+readonly CACHE_WALL="${XDG_CACHE_HOME:-$HOME/.cache}/wallpaper"
+[[ -d "$CACHE_WALL" ]] || mkdir -p "$CACHE_WALL"
+ln -sf "$WALLPAPER" "$CACHE_WALL/wallpaper.png"
+

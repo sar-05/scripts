@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+flatpak run ch.protonmail.protonmail-bridge --no-window &
+sleep 10
+flatpak run org.mozilla.Thunderbird

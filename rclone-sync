@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+
+#Define variables
+exclude_file_path="${XDG_CONFIG_HOME:=$HOME/.config}/rclone/rclone-exclude.txt"
+remote="Proton"
+
+# Check if rclone is installed
+if ! command -v rclone > /dev/null; then
+  echo "Rclone package missing"
+  exit
+fi
+
+#Check if remote has been configured
+if ! grep -q "$remote" <<< "$(rclone listremotes 2>&1)"; then
+  echo "Remote $remote hasn't been configured yet"
+  exit
+fi
+
+# Check existance of exclude_file
+[ ! -f "$exclude_file_path" ] && touch "$exclude_file_path" && echo "Warning: Empty exclude file!"
+
+#Create packages backups
+if ! packages-backup; then
+  echo "ERROR: Unable to run packages-backup"
+fi
+
+# Sync files to Proton Drive
+rclone sync ~/Documents --exclude-from "$exclude_file_path" "$remote":'Documents' -vv
+rclone sync ~/Backups --exclude-from "$exclude_file_path" "$remote":'Backups' -vv
+rclone sync ~/Dotfiles --exclude ".git/**" "$remote":'Dotfiles' -vv
