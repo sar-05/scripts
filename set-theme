@@ -116,9 +116,9 @@ if [ -d "/usr/share/themes/$GTK/gtk-4.0" ]; then
 fi
 
 #Setting QT theme
-readonly QT_CONF_FILE="$HOME/.config/qt6ct/qt6ct.conf"
-if [ -f "$QT_CONF_FILE" ]; then
-  sed -i "s|^color_scheme_path=.*|color_scheme_path=$QT|" "$QT_CONF_FILE"
+readonly QT_CONF_PATH="$HOME/.config/qt6ct"
+if [ -f "$QT_CONF_PATH/qt6ct.conf" ]; then
+  sed -i "s|^color_scheme_path=.*|color_scheme_path=$QT_CONF_PATH/colors/$QT.conf|" "$QT_CONF_PATH/qt6ct.conf"
 else
   log -w "$QT_CONF_FILE not found"
 fi
