@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+NOTIFY=1
+
+if ! command -v hyprctl > /dev/null; then
+  echo "FAtAL: hyprctl not found"
+fi
+
+if command -v notify-send > /dev/null; then
+  readonly NOTIFY=0
+fi
+
+if_notify(){
+  local flag="$1"
+  local message="$2"
+  if [[ "$flag" -eq 0 ]]; then
+    notify-send "$message"
+  fi
+}
+
+str=$(hyprctl getoption input:kb_options | grep str | awk '{print $2}' )
+
+if [[ -z $str ]]; then
+  hyprctl keyword input:kb_options "caps:swapescape" > /dev/null && \
+    if_notify "$NOTIFY" "Swapescape turned on"
+else
+  hyprctl keyword input:kb_options "" > /dev/null && \
+    if_notify "$NOTIFY" "Swapescape turned off"
+fi
