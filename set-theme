@@ -5,6 +5,10 @@ set -euo pipefail
 
 CONF_FILE="${XDG_CONFIG_HOME:=$HOME/.config}/set-theme/set-theme.conf"
 
+if [[ ! -f "$CONF_FILE" ]]; then
+  echo "FATAL: Unable to find $CONF_FILE"
+fi
+
 declare -A conf
 while IFS='=' read -r key value; do
   #regex matches whitespace POSIX character class and # at the start of a line
