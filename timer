@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# Give a time in minutes, set an alarm, reproduce with mpv
+
+# - Config file for alarm
+# x Options to set alarm (sound, time format)
+# x Verify dependenciesa
+# - Add sound check function
+
+factor=60
+minutes="$1"
+sound="$HOME/Music/Oasis - I Hope, I Think, I Know.mp3"
+
+if ! command -v 'mpv' && ! flatpak info io.mpv.Mpv >/dev/null; then
+  echo "FATAL: MPV not found"
+  exit 1
+fi
+
+check_args(){
+  local arg_num=$1
+  local expected_num=$2
+  if [[ "$arg_num" -ne "$expected_num" ]]; then
+    echo "Invalid num of args"
+    exit 1
+  fi
+}
+
+# if [[ "$#" -eq 0 ]]; then
+  minutes="$2"
+  while getopts 'f:s' OPT; do
+    case "$OPT" in
+      'f')
+        sound="$OPTARG"
+        ;;
+      's') factor=1;;
+      :)
+        echo "FATAL option -$OPTARG requires an argument"
+        exit 1
+        ;;
+
+      ?) echo "FATAL: Invalid flag" ;;
+    esac
+  done
+# else
+#   echo "FATAL: Needs at two args"
+#   exit 1
+# fi
+
+seconds=$(("$minutes" * "$factor"))
+sleep "$seconds" && flatpak run io.mpv.Mpv "$sound"
