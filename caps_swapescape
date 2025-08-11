@@ -16,15 +16,30 @@ if_notify(){
   local message="$2"
   if [[ "$flag" -eq 0 ]]; then
     notify-send "$message"
+  else
+    echo "$message"
   fi
 }
 
-str=$(hyprctl getoption input:kb_options | grep str | awk '{print $2}' )
+is_swap(){
+  # Returns 1 when swap is off
+  if ! hyprctl getoption input:kb_options | grep -q "caps:swapescape"; then
+    return 1
+  fi
+}
 
-if [[ -z $str ]]; then
-  hyprctl keyword input:kb_options "caps:swapescape" > /dev/null && \
-    if_notify "$NOTIFY" "Swapescape turned on"
-else
+swap_off(){
   hyprctl keyword input:kb_options "" > /dev/null && \
     if_notify "$NOTIFY" "Swapescape turned off"
+}
+
+swap_on(){
+  hyprctl keyword input:kb_options "caps:swapescape" > /dev/null && \
+    if_notify "$NOTIFY" "Swapescape turned on"
+}
+
+if is_swap; then
+  swap_off
+else
+  swap_on 
 fi
