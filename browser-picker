@@ -47,7 +47,7 @@ for browser in "${!browsers[@]}"; do
 done
 
 # Show rofi menu
-chosen=$(echo -e "$menu_options" | rofi -dmenu -p "Open with:" -theme-str 'window {width: 400px;}')
+chosen=$(echo -e "$menu_options" | rofi -dmenu -i -p "Open with" -theme-str 'window {width: 400px;}')
 
 # Check if user made a selection
 if [[ -z "$chosen" ]]; then
