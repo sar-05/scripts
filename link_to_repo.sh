@@ -3,44 +3,36 @@
 SRC="$HOME/VM_Share/windows_11/Scripts"
 TARGET="$HOME/Repos/ejercicios_pc"
 
-get_directories() {
-  # Recieves a source to check directories
-  # Returns absolute paths to directories in a given directory
-  local src="$1"
-  for dir in "$src"/*; do
-    if [[ -d "$dir" ]]; then
-      echo "$dir"
-    fi
-  done
-}
-
-get_files() {
-  # Recieves absolute paths of dirs from stdin
-  # Returns absolute paths to files in a given directory
-  while IFS= read -r dir; do
-    for file in "$dir"/*; do
-      if [[ -f "$file" ]]; then
-        echo -n "$file;" && basename "$dir"
-      fi
-    done
-  done
-}
-
-link_files() {
-  # Recieves a path;parent string from stdin
-  local target="$1"
-  while IFS=';' read -r path parent; do
-    mkdir -p "$target/$parent"
-    ln "$path" "$target/$parent"
-  done
-}
-
 main() {
-  # Recieves SRC and TARGET
-  # Executes the link operation
-  local src="$1"
-  local target="$2"
-  get_directories "$src" | get_files | link_files "$target"
+    local src="$1"
+    local target="$2"
+    
+    # Validation
+    [[ ! -d "$src" ]] && { echo "Error: Source '$src' not found" >&2; exit 1; }
+    
+    # Create target directory
+    mkdir -p "$target"
+    
+    # Find all files (excluding this script) and create hard links
+    find "$src" -type f -not -name "$(basename "$0")" -print0 | while IFS= read -r -d '' file; do
+        # Calculate relative path and target location
+        local rel_path="${file#"$src"/}"
+        local target_file="$target/$rel_path"
+        
+        # Create directory structure
+        mkdir -p "$(dirname "$target_file")"
+        
+        # Create hard link if target doesn't exist
+        if [[ ! -e "$target_file" ]]; then
+            if ln "$file" "$target_file" 2>/dev/null; then
+                echo "Linked: $rel_path"
+            else
+                echo "Failed: $rel_path" >&2
+            fi
+        else
+            echo "Exists: $rel_path"
+        fi
+    done
 }
 
 main "$SRC" "$TARGET"
