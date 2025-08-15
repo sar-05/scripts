@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# hyprshot in raw mode returns 1 even when succesfully sending the raw data 
+# through a pipe, probably because its send a SIGPIPE to term the process
+# Enclosed hyprshot process so it always returns true
+url=$({ hyprshot --mode region --freeze --raw || true ;} | zbarimg --oneshot --quiet - | sed 's/QR-Code://g')
+xdg-open "$url"
