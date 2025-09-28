@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Wrapper that executes set-theme with appropriate flag according to time
 
 HOUR=$(date +%H)
@@ -10,7 +10,7 @@ if [[ ! -f "$SET_THEME" ]]; then
 fi
 
 if [ "$HOUR" -ge 6 ] && [ "$HOUR" -lt 19 ]; then
-     "$SET_THEME" -l
+  "$SET_THEME" -l
 else
-    "$SET_THEME" -d
+  "$SET_THEME" -d
 fi

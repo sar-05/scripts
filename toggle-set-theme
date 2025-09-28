@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Wrapper that executes set-theme with appropriate flag according to current theme
+
+CONF_FILE="${XDG_CONFIG_HOME:=$HOME/.config}/set-theme/set-theme.conf"
+
+if [[ ! -f "$CONF_FILE" ]]; then
+  echo "FATAL: Unable to find $CONF_FILE"
+fi
+
+declare -A conf
+while IFS='=' read -r key value; do
+  #regex matches whitespace POSIX character class and # at the start of a line
+  [[ -n "$key" && ! "$key" =~ ^[[:space:]]*# ]] || continue
+  conf["$key"]="$value"
+done <"$CONF_FILE"
+
+SET_THEME_PATH="$HOME/.local/bin/set-theme"
+CURRENT_THEME=$(gsettings get org.gnome.desktop.interface gtk-theme)
+DARK_THEME="'${conf[dark_gtk]}'"
+LIGHT_THEME="'${conf[light_gtk]}'"
+
+if [[ ! -f "$SET_THEME_PATH" ]]; then
+  echo "Unable to find set-theme script at $SET_THEME_PATH"
+  exit 1
+fi
+
+if [[ "$CURRENT_THEME" == "$DARK_THEME" ]]; then
+  "$SET_THEME_PATH" -l
+elif [[ "$CURRENT_THEME" == "$LIGHT_THEME" ]]; then
+  "$SET_THEME_PATH" -d
+else
+  echo "Unrecognized theme: $CURRENT_THEME"
+  exit 1
+fi
