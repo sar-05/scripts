@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+BOOKS_DIR="${HOME}/Documents/books"
+
+if [[ ! -d "${BOOKS_DIR}" ]]; then
+  rofi -e "Unable to find books directory at ${BOOKS_DIR}"
+  exit 1
+fi
+
+BOOK_NAME=$(basename --multiple "${BOOKS_DIR}"/*/* | rofi -case-smart -matching fuzzy -dmenu)
+
+xdg-open "${BOOKS_DIR}/"**"/${BOOK_NAME}"
