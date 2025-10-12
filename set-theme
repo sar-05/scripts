@@ -36,7 +36,7 @@ is_valid(){
     '-g') path="/usr/share/themes/$theme/index.theme" ;;
     '-t') path="$HOME/.themes/$theme/index.theme" ;;
     '-i') path="/usr/share/icons/$theme/index.theme" ;;
-    '-c') path="$HOME/.icons/$theme/index.theme" ;;
+    '-c') path="${XDG_DATA_HOME}/icons/$theme/index.theme" ;;
     '-q') path="$HOME/.config/qt6ct/colors/$theme.conf" ;;
     '-w') path="$theme" ;;
     *) log -e "Invalid option: $opt" ; return 1 ;;
@@ -59,7 +59,7 @@ copy_global(){
   local theme="$2"
   case "$opt" in
     '-g') dir="/usr/share/themes/$theme" ; target="$HOME/.themes/" ;;
-    '-i') dir="/usr/share/icons/$theme" ; target="$HOME/.icons/" ;;
+    '-i') dir="/usr/share/icons/$theme" ; target="${XDG_DATA_HOME}/icons/" ;;
     *) return 1 ;;
   esac
 
@@ -132,4 +132,3 @@ hyprctl hyprpaper wallpaper "$(hyprctl monitors -j | jq -r '.[0].name'),$WALLPAP
 readonly CACHE_WALL="${XDG_CACHE_HOME:-$HOME/.cache}/wallpaper"
 [[ -d "$CACHE_WALL" ]] || mkdir -p "$CACHE_WALL"
 ln -sf "$WALLPAPER" "$CACHE_WALL/wallpaper.png"
-
