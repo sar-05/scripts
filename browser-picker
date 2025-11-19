@@ -1,69 +1,45 @@
 #!/bin/bash
-# Browser picker for mimeapps integration
-# The URL is passed as the first argument by xdg-open
+set -euo pipefail
 
-URL="$1"
+CONFIG_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/browser-picker/browser-picker.conf"
 
-# Fix the config path (was missing /)
-CONF_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/browser-picker/browser-picker.conf"
-
-# Ensure we have access to the display (important for rofi)
-if [[ -z "$DISPLAY" && -z "$WAYLAND_DISPLAY" ]]; then
-    # Fallback to default browser if no display available
-    firefox "$URL" &
-    exit 0
+if [[ $# -ne 1 ]]; then
+  echo "Usage: $0 <url>" >&2
+  exit 1
 fi
 
-# If no URL provided, exit silently (mimeapps might call without arguments)
-if [[ -z "$URL" ]]; then
-    exit 1
-fi
+URL=$1
 
-# Check if config file exists
-if [[ ! -f "$CONF_FILE" ]]; then
-    echo "Config file not found: $CONF_FILE" >&2
-    exit 1
+if [[ ! -f $CONFIG_FILE ]]; then
+  echo "Error: Config file not found at $CONFIG_FILE" >&2
+  exit 1
 fi
 
 declare -A browsers
+ordered_names=()
 
-# Read browser configuration
-while IFS='=' read -r browser bin; do
-    # Skip empty lines and comments
-    [[ -z "$browser" || "$browser" =~ ^[[:space:]]*# ]] && continue
-    browsers["$browser"]="$bin"
-done < "$CONF_FILE"
+while IFS='=' read -r name cmd; do
+  # Skip comments, empty lines and lines with spaces only
+  if [[ -z ${name//[[:space:]]/} || $name =~ ^# ]]; then
+    continue
+  fi
 
-# Check if we have any browsers configured
-if [[ ${#browsers[@]} -eq 0 ]]; then
-    echo "No browsers configured in $CONF_FILE" >&2
-    exit 1
+  browsers["$name"]="$cmd"
+  ordered_names+=("$name")
+done <"$CONFIG_FILE"
+
+# Show the list using rofi in config order
+chosen=$(printf '%s\n' "${ordered_names[@]}" |
+  rofi -dmenu -case-smart -p "Open with browser")
+
+# If user canceled
+[[ -z $chosen ]] && exit 0
+
+cmd=${browsers[$chosen]}
+if [[ -n $cmd ]]; then
+  # Ensure the full URL is treated as one argument by quoting
+  bash -c "$cmd \"$URL\"" &
+else
+  echo "Error: command for '$chosen' not found." >&2
+  exit 1
 fi
-
-# Create menu options
-menu_options=""
-for browser in "${!browsers[@]}"; do
-    menu_options="${menu_options}${browser}\n"
-done
-
-# Show rofi menu
-chosen=$(echo -e "$menu_options" | rofi -dmenu -i -p "Open with" -theme-str 'window {width: 400px;}')
-
-# Check if user made a selection
-if [[ -z "$chosen" ]]; then
-    echo "No browser selected" >&2
-    exit 1
-fi
-
-# Get the command for the chosen browser
-cmd="${browsers[$chosen]}"
-
-# Check if command exists
-if [[ -z "$cmd" ]]; then
-    echo "No command found for: $chosen" >&2
-    exit 1
-fi
-
-echo "Opening URL with: $cmd"
-# Use eval to properly handle commands with multiple arguments
-eval "nohup $cmd \"$URL\" >/dev/null 2>&1 &"
