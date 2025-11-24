@@ -37,8 +37,8 @@ chosen=$(printf '%s\n' "${ordered_names[@]}" |
 
 cmd=${browsers[$chosen]}
 if [[ -n $cmd ]]; then
-  # Ensure the full URL is treated as one argument by quoting
-  bash -c "$cmd \"$URL\"" &
+  # Run screen to dettach process to the background cleanly
+  screen -S "${cmd}" -dm ${cmd} ${URL}
 else
   echo "Error: command for '$chosen' not found." >&2
   exit 1
