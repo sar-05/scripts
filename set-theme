@@ -114,6 +114,9 @@ flatpak override --user --env=GTK_THEME="$GTK"  --env=ICON_THEME="$ICONS"
 # Apply GTK4 theme settings
 rm -rf ~/.config/gtk-4.0
 mkdir -p ~/.config/gtk-4.0
+echo "env = GTK_THEME,$GTK" > ~/.config/hypr/hyprconf/GTK_THEME.conf
+systemctl --user set-environment GTK_THEME="$GTK"
+export GTK_THEME="$GTK"
 # Symlink the theme's GTK4 CSS files
 if [ -d "/usr/share/themes/$GTK/gtk-4.0" ]; then
   ln -s /usr/share/themes/"$GTK"/gtk-4.0/* ~/.config/gtk-4.0/
@@ -126,6 +129,9 @@ if [ -f "$QT_CONF_PATH/qt6ct.conf" ]; then
 else
   log -w "$QT_CONF_FILE not found"
 fi
+
+# Reload waybar service
+systemctl --user restart waybar.service
 
 #Apply Wallpaper
 hyprctl hyprpaper wallpaper "$(hyprctl monitors -j | jq -r '.[0].name'),$WALLPAPER"
