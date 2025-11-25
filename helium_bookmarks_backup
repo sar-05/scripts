@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+
+BOOKMARKS="${XDG_CONFIG_HOME:-HOME/.config}/net.imput.helium/Default/Bookmarks"
+BACKUPS="${HOME}/Backups/bookmarks"
+NOTIFY=1
+
+is_notify_send(){
+	if command -v notify-send; then
+		NOTIFY=0
+	fi
+}
+
+err(){
+	if [[ "${NOTIFY}" -eq 0 ]]; then
+		notify-send "$*"
+	fi
+	echo "$*" >&2
+}
+
+is_notify_send
+
+if [[ ! -f "${BOOKMARKS}" ]]; then
+	err "Bookmarks file isn't at $BOOKMARKS"
+	exit 1
+fi
+
+if [[ ! -d "${BACKUPS}" ]]; then
+	err "No bookmarks backups directory at ${BACKUPS}"
+	exit 1
+fi
+
+cp "${BOOKMARKS}" "${BACKUPS}/bookmarks_$(date --utc +%Y-%m-%d).json"
