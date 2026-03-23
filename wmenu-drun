@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+
+system_dir="/usr/share/applications/"
+local_dir="$HOME/.local/share/applications/"
+
+app=$(cat <(ls "$system_dir") <(ls "$local_dir") | sort | uniq | sed 's/.desktop//' | wmenu "$@")
+
+local_app="$local_dir/$app.desktop"
+system_app="$system_dir/$app.desktop"
+
+if [[ -f "$local_app" ]]; then
+  path="$local_app"
+elif [[ -f "$system_app" ]]; then
+  path="$system_app"
+else
+  path=''
+fi
+
+if [[ -z "$path" ]]; then
+  echo "String is empty"
+elif grep -q -E '^Terminal=true$' "$path"; then
+  cmd=$(grep -E '^Exec=' "$path")
+  #leave cmd expansion unquoted to allow globbing and word splitting of parameters
+  #shellcheck disable=SC2086
+  xdg-terminal-exec ${cmd#*=}
+else
+  app2unit "${path}"
+fi
