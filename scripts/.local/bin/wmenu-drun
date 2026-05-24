@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+
+set -uo pipefail
+
+system_dir="/usr/share/applications/"
+local_dir="$HOME/.local/share/applications/"
+
+app_name=$(grep -E '^Name=[^\[]*' -R "$system_dir" "$local_dir" | cut -d '=' -f 2 | sort | uniq | wmenu "$@")
+
+if [ -z "$app_name" ]; then
+  exit 0
+fi
+
+app_file=$(grep -E "^Name=$app_name" -R "$local_dir" | cut -d ':' -f 1)
+
+if [ -z "$app_file" ]; then
+  app_file=$(grep -E "^Name=$app_name" -R "$system_dir" | cut -d ':' -f 1)
+fi
+
+app_file=$(readlink -f "$app_file")
+
+cmd=$(grep -E '^Exec=' "$app_file")
+if grep -q -R -E "^Terminal=true" "$app_file"; then
+  #leave cmd expansion unquoted to allow globbing and word splitting of parameters
+  #shellcheck disable=SC2086
+  xdg-terminal-exec ${cmd#*=}
+else
+  dex "${app_file}"
+fi
