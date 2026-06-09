@@ -1,26 +1,63 @@
 #!/usr/bin/env bash
 
-set -uo pipefail
+set -euo pipefail
 
-system_dir="/usr/share/applications/"
-local_dir="$HOME/.local/share/applications/"
+system_dir="/usr/share/applications"
+local_dir="$HOME/.local/share/applications"
 
-app_name=$(grep -E '^Name=[^\[]*' -R "$system_dir" "$local_dir" | cut -d '=' -f 2 | sort | uniq | wmenu "$@")
+declare -A desktop_files
 
-if [ -z "$app_name" ]; then
+parse_desktop_file() {
+  local file=$1
+  local regex=$2
+  mapfile -t -n 1000 lines <"${file}"
+
+  block=0
+  for line in "${lines[@]}"; do
+
+    if [[ block -eq 0 ]]; then
+      if [[ "${line}" == '[Desktop Entry]' ]]; then
+        block=1
+      fi
+    elif [[ block -eq 1 ]]; then
+      if [[ "${line}" =~ ^\[.*\]$ ]]; then
+        return
+      elif [[ "${line}" =~ $regex ]]; then
+        echo "${line#*=}"
+        return
+      fi
+    fi
+  done
+
+  return
+}
+
+for file in "${system_dir}"/* "${local_dir}"/*; do
+  if [[ "${file}" =~ .+\.desktop$ ]]; then
+    app_name=$(parse_desktop_file "${file}" '^Name=.+')
+    echo "${app_name}" >&2
+    if [[ -n "${app_name}" ]]; then
+      desktop_files["${app_name}"]="${file}"
+    fi
+  fi
+done
+
+app_name=$(printf '%s\n' "${!desktop_files[@]}" | sort | uniq | wmenu "$@")
+
+if [[ -z "${app_name}" ]]; then
   exit 0
 fi
 
-app_file=$(grep -E "^Name=$app_name" -R "$local_dir" | cut -d ':' -f 1)
-
-if [ -z "$app_file" ]; then
-  app_file=$(grep -E "^Name=$app_name" -R "$system_dir" | cut -d ':' -f 1)
+if [[ -z "${desktop_files[${app_name}]}" ]]; then
+  echo "Failed to retrieved desktop file for ${desktop_files[${app_name}]}" >&2
+  exit 1
 fi
 
-app_file=$(readlink -f "$app_file")
+app_file="${desktop_files[${app_name}]}"
+app_file=$(realpath "$app_file")
 
-cmd=$(grep -E '^Exec=' "$app_file")
-if grep -q -R -E "^Terminal=true" "$app_file"; then
+if [[ $(parse_desktop_file "${app_file}" '^Terminal=true$') == true ]]; then
+  cmd=$(parse_desktop_file "${app_file}" '^Exec=.+')
   #leave cmd expansion unquoted to allow globbing and word splitting of parameters
   #shellcheck disable=SC2086
   xdg-terminal-exec ${cmd#*=}
