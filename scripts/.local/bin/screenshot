@@ -1,2 +1,3 @@
 #!/usr/bin/env bash
-grim -g "$(slurp)" - | tee ${GRIM_DEFAULT_DIR}/Screenshot_$(date +"%Y%m%d-%H%M%S").jpg | wl-copy
+
+grim -g "$(slurp)" - | tee "${GRIM_DEFAULT_DIR}"/Screenshot_"$(date +"%Y%m%d-%H%M%S")".png | wl-copy
