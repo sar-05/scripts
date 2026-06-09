@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+
+exec <&-
+
+dwlb \
+  -ipc \
+  -active-bg-color 'bb9dbd' \
+  -middle-bg-color-selected '000000' \
+  -occupied-bg-color '000000' \
+  -inactive-bg-color '000000' \
+  -no-active-color-title \
+  -font monospace:10 \
+  -scale 2 &
+
+PIPE="${XDG_RUNTIME_DIR}/dwlb-status.pipe"
+SOCKET="dwlb-0"
+
+[[ -p "$PIPE" ]] || mkfifo "$PIPE"
+
+build_status() {
+  local date vol bat
+  date=$(date '+%a %d %b  %H:%M')
+  vol=$(wpctl get-volume @DEFAULT_AUDIO_SINK@ | awk '{
+        muted = /MUTED/ ? " [M]" : ""
+        printf "Vol: %d%%%s", $2 * 100, muted
+    }')
+  bat=$(cat /sys/class/power_supply/BAT0/capacity 2>/dev/null | sed 's/$/%/' || echo "AC")
+
+  echo "$vol  |  $bat  |  $date"
+}
+
+update_bar() {
+  dwlb -status all "$(build_status)" -target-socket "$SOCKET"
+}
+
+(while true; do
+  sleep 60
+  echo tick >"$PIPE"
+done) &
+TIMER_PID=$!
+
+# Cleanup on exit
+trap 'kill $TIMER_PID; rm -f "$PIPE"' EXIT
+
+update_bar
+
+# Open pipe in read-write mode (the <> trick) so reads never get EOF
+# when there are temporarily no writers
+while read -r _ <>"$PIPE"; do
+  update_bar
+done
